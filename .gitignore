@@ -1,0 +1,15 @@
+.dart_tool/
+.packages
+.pub/
+build/
+android/
+ios/
+linux/
+macos/
+windows/
+web/
+.idea/
+.vscode/
+*.iml
+*.keystore
+key.properties
