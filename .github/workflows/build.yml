@@ -24,25 +24,57 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Generate Android project files
-        run: |
-          flutter create --platforms=android --org com.moataz --project-name alalqami .
+      - name: Flutter version
+        run: flutter --version
 
-      - name: Configure Android Manifest and App Name
+      - name: Create Android if missing
         run: |
-          # Add Internet Permission
-          sed -i '/<manifest/a \    <uses-permission android:name="android.permission.INTERNET" />' android/app/src/main/AndroidManifest.xml
-          # Change App Label (Display Name)
-          sed -i 's/android:label="[^"]*"/android:label="معتز العلقمي"/' android/app/src/main/AndroidManifest.xml
+          if [ ! -d "android" ]; then
+            flutter create . --platforms=android --project-name alalqamiplat
+          fi
+
+      - name: Remove test folder
+        run: rm -rf test
+
+      - name: Set Android app name and permissions
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          if manifest.exists():
+              text = manifest.read_text()
+              
+              permission = '<uses-permission android:name="android.permission.INTERNET" />'
+              if permission not in text:
+                  text = text.replace(
+                      '<manifest xmlns:android="http://schemas.android.com/apk/res/android">',
+                      '<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    ' + permission
+                  )
+
+              if 'android:label=' in text:
+                  text = re.sub(r'android:label="[^"]*"', 'android:label="معتز العلقمي"', text, count=1)
+              else:
+                  text = text.replace('<application ', '<application android:label="معتز العلقمي" ', 1)
+
+              manifest.write_text(text)
+
+          values = Path("android/app/src/main/res/values")
+          values.mkdir(parents=True, exist_ok=True)
+          strings = values / "strings.xml"
+          strings.write_text('''<?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <string name="app_name">معتز العلقمي</string>
+          </resources>
+          ''')
+          PY
 
       - name: Get Flutter dependencies
         run: flutter pub get
 
       - name: Generate Launcher Icons
         run: dart run flutter_launcher_icons
-
-      - name: Remove test folder if exists
-        run: rm -rf test
 
       - name: Flutter Analyze
         run: flutter analyze --no-fatal-infos
