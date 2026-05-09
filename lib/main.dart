@@ -53,7 +53,7 @@ class MoatazApp extends StatelessWidget {
             fontSize: 19,
           ),
         ),
-        cardTheme: CardThemeData(
+        cardTheme: CardTheme(
           elevation: 0,
           color: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
