@@ -1,0 +1,104 @@
+name: Build Flutter APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.24.5"
+          channel: stable
+          cache: true
+
+      - name: Show Flutter version
+        run: flutter --version
+
+      - name: Create Android platform if missing
+        run: |
+          if [ ! -d "android" ]; then
+            flutter create . --platforms=android --project-name alalqamiplat
+          fi
+
+      - name: Remove generated sample tests
+        run: |
+          rm -rf test
+
+      - name: Set Android app name and internet permission
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          text = manifest.read_text()
+
+          permission = '<uses-permission android:name="android.permission.INTERNET" />'
+          if permission not in text:
+              text = text.replace(
+                  '<manifest xmlns:android="http://schemas.android.com/apk/res/android">',
+                  '<manifest xmlns:android="http://schemas.android.com/apk/res/android">\\n    ' + permission
+              )
+
+          if 'android:label=' in text:
+              text = re.sub(r'android:label="[^"]*"', 'android:label="@string/app_name"', text, count=1)
+          else:
+              text = text.replace('<application ', '<application android:label="@string/app_name" ', 1)
+
+          manifest.write_text(text)
+
+          values = Path("android/app/src/main/res/values")
+          values.mkdir(parents=True, exist_ok=True)
+
+          strings = values / "strings.xml"
+          strings.write_text('''<?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <string name="app_name">معتز العلقمي</string>
+          </resources>
+          ''')
+          PY
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate launcher icons if icon exists
+        run: |
+          if grep -q "flutter_launcher_icons" pubspec.yaml && [ -f "assets/icon.png" ]; then
+            dart run flutter_launcher_icons
+          else
+            echo "Skipping launcher icons: flutter_launcher_icons or assets/icon.png missing"
+          fi
+
+      - name: Analyze project
+        run: flutter analyze --no-fatal-infos
+
+      - name: Build split APKs
+        run: flutter build apk --release --split-per-abi
+
+      - name: Build universal APK
+        run: flutter build apk --release
+
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: moataz-alalqami-apk
+          path: |
+            build/app/outputs/flutter-apk/*.apk
