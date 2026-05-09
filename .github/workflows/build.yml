@@ -32,10 +32,35 @@ jobs:
       - name: Show Flutter version
         run: flutter --version
 
-      - name: Create Android platform if missing
+      - name: Normalize Flutter project name
         run: |
-          if [ ! -d "android" ]; then
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          pubspec = Path("pubspec.yaml")
+          text = pubspec.read_text()
+          text = re.sub(r"^name:\s*.+$", "name: alalqamiplat", text, count=1, flags=re.M)
+          pubspec.write_text(text)
+
+          main = Path("lib/main.dart")
+          if main.exists():
+              t = main.read_text()
+              t = t.replace("CardThemeData(", "CardTheme(")
+              main.write_text(t)
+          PY
+
+      - name: Create Android platform if missing or incomplete
+        run: |
+          if [ ! -f "android/app/src/main/AndroidManifest.xml" ]; then
+            echo "Android platform missing or incomplete. Regenerating..."
+            rm -rf android
             flutter create . --platforms=android --project-name alalqamiplat
+          fi
+
+          if [ ! -f "android/app/src/main/AndroidManifest.xml" ]; then
+            echo "AndroidManifest.xml still missing after flutter create"
+            exit 1
           fi
 
       - name: Remove generated sample tests
@@ -49,6 +74,10 @@ jobs:
           import re
 
           manifest = Path("android/app/src/main/AndroidManifest.xml")
+
+          if not manifest.exists():
+              raise SystemExit("AndroidManifest.xml not found")
+
           text = manifest.read_text()
 
           permission = '<uses-permission android:name="android.permission.INTERNET" />'
@@ -74,6 +103,8 @@ jobs:
               <string name="app_name">معتز العلقمي</string>
           </resources>
           ''')
+
+          print("AndroidManifest.xml fixed successfully")
           PY
 
       - name: Install dependencies
@@ -84,7 +115,7 @@ jobs:
           if grep -q "flutter_launcher_icons" pubspec.yaml && [ -f "assets/icon.png" ]; then
             dart run flutter_launcher_icons
           else
-            echo "Skipping launcher icons: flutter_launcher_icons or assets/icon.png missing"
+            echo "Skipping launcher icon generation because assets/icon.png or flutter_launcher_icons is missing."
           fi
 
       - name: Analyze project
@@ -95,6 +126,11 @@ jobs:
 
       - name: Build universal APK
         run: flutter build apk --release
+
+      - name: Verify APK outputs
+        run: |
+          ls -lah build/app/outputs/flutter-apk/
+          test -f build/app/outputs/flutter-apk/app-release.apk
 
       - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
