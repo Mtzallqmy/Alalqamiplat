@@ -27,9 +27,7 @@ class AdminLoginPage extends StatelessWidget {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('دخول الإدارة'),
-        ),
+        appBar: AppBar(title: const Text('دخول الإدارة')),
         body: const Center(
           child: Padding(
             padding: EdgeInsets.all(24),
